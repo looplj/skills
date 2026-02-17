@@ -1,0 +1,46 @@
+version: 2
+
+project_name: find-skills
+
+dist: .builds
+
+builds:
+  - id: find-skills
+    dir: ./cmd/find-skills
+    main: .
+    binary: find-skills
+    flags:
+      - -trimpath
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+release:
+  draft: true
+
+archives:
+  - id: archive
+    ids: [find-skills]
+    formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-snapshot'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^examples:'
+      - '^ui:'
