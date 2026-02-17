@@ -1,7 +1,6 @@
 package skills
 
 import (
-	"errors"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -16,7 +15,7 @@ type skillFrontmatter struct {
 func ParseSkillMarkdown(content string) (Skill, error) {
 	fm, body, ok := splitFrontmatter(content)
 	if !ok {
-		return Skill{}, errors.New("missing frontmatter")
+		return Skill{}, ErrMissingFrontmatter
 	}
 
 	var parsed skillFrontmatter
@@ -25,11 +24,11 @@ func ParseSkillMarkdown(content string) (Skill, error) {
 	}
 
 	if strings.TrimSpace(parsed.Name) == "" {
-		return Skill{}, errors.New("frontmatter missing name")
+		return Skill{}, ErrMissingName
 	}
 
 	if strings.TrimSpace(parsed.Description) == "" {
-		return Skill{}, errors.New("frontmatter missing description")
+		return Skill{}, ErrMissingDescription
 	}
 
 	_ = body

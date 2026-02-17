@@ -1,7 +1,6 @@
 package skills
 
 import (
-	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -95,7 +94,7 @@ func copyDir(srcDir, dstDir string) error {
 
 func installFromDirToTargets(installName string, srcDir string, targetDirs []string, mode InstallMode) error {
 	if len(targetDirs) == 0 {
-		return errors.New("no target dirs specified")
+		return ErrNoTargetDirs
 	}
 
 	primarySkillsDir := targetDirs[0]
@@ -139,7 +138,7 @@ func installFromDirToTargets(installName string, srcDir string, targetDirs []str
 				return err
 			}
 		default:
-			return errors.New("unknown install mode")
+			return ErrUnknownInstallMode
 		}
 	}
 

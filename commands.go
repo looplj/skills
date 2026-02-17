@@ -2,7 +2,7 @@ package skills
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,7 +16,7 @@ func resolveTargetDirs(cwd string, global bool, dirs []string, agents []AgentTyp
 	}
 
 	if !enableAgentDiscovery {
-		return nil, nil, errors.New("target dirs are required when agent discovery is disabled")
+		return nil, nil, ErrAgentDiscoveryRequired
 	}
 
 	agentList := agents
@@ -83,7 +83,7 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 	}
 
 	if opts.Source == "" {
-		return AddResult{}, errors.New("source is required")
+		return AddResult{}, ErrSourceRequired
 	}
 
 	cwd, err := os.Getwd()
@@ -158,7 +158,7 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 			} else if opts.Yes {
 				entries = idx.Skills
 			} else {
-				return AddResult{}, errors.New("multiple well-known skills found; specify --skill or --yes")
+				return AddResult{}, ErrMultipleWellKnown
 			}
 		} else if containsStar(opts.Skills) {
 			entries = idx.Skills
@@ -244,7 +244,7 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 	case SkillSourceTypeLocal, SkillSourceTypeGitHub, SkillSourceTypeGitLab, SkillSourceTypeGit:
 		break
 	case SkillSourceTypeSearchHint:
-		return AddResult{}, errors.New("unsupported source type: search-hint")
+		return AddResult{}, ErrUnsupportedSourceType
 	}
 
 	var repo *clonedRepo
@@ -266,11 +266,11 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 			return AddResult{}, err
 		}
 	case SkillSourceTypeDirectURL, SkillSourceTypeWellKnown:
-		return AddResult{}, errors.New("unsupported source type")
+		return AddResult{}, ErrUnsupportedSourceType
 	case SkillSourceTypeSearchHint:
-		return AddResult{}, errors.New("unsupported source type: search-hint")
+		return AddResult{}, ErrUnsupportedSourceType
 	default:
-		return AddResult{}, errors.New("unsupported source type")
+		return AddResult{}, ErrUnsupportedSourceType
 	}
 
 	found, err := DiscoverSkills(baseDir, opts.FullDepth)
@@ -295,7 +295,7 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 	}
 
 	if len(found) == 0 {
-		return AddResult{}, errors.New("no skills found")
+		return AddResult{}, ErrNoSkillsFound
 	}
 
 	var selected []Skill
@@ -304,7 +304,7 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 		if len(found) == 1 || opts.Yes {
 			selected = found
 		} else {
-			return AddResult{}, errors.New("multiple skills found; specify --skill or --yes")
+			return AddResult{}, ErrMultipleSkills
 		}
 	} else if containsStar(opts.Skills) {
 		selected = found
@@ -384,10 +384,6 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 }
 
 func List(opts ListOptions) ([]ListedSkill, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
 
 	if len(opts.Dirs) > 0 {
 		type item struct {
@@ -438,7 +434,12 @@ func List(opts ListOptions) ([]ListedSkill, error) {
 	}
 
 	if !opts.EnableAgentDiscovery {
-		return nil, errors.New("target dirs are required when agent discovery is disabled")
+		return nil, ErrAgentDiscoveryRequired
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
 	}
 
 	canonicalDir, err := CanonicalSkillsDir(opts.Global, cwd)
@@ -496,16 +497,69 @@ func List(opts ListOptions) ([]ListedSkill, error) {
 	return out, nil
 }
 
-func Remove(opts RemoveOptions) (RemoveResult, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return RemoveResult{}, err
+func Get(opts GetOptions) (GetResult, error) {
+	if opts.Skill == "" {
+		return GetResult{}, ErrSkillNameRequired
 	}
 
 	if len(opts.Dirs) > 0 {
+		for _, root := range dedupeDirs(opts.Dirs) {
+			s, err := readInstalledSkill(root, opts.Skill)
+			if err == nil {
+				return GetResult{InstallName: opts.Skill, Skill: s}, nil
+			}
+		}
+
+		return GetResult{}, fmt.Errorf("%w: %s", ErrSkillNotFound, opts.Skill)
+	}
+
+	if !opts.EnableAgentDiscovery {
+		return GetResult{}, ErrAgentDiscoveryRequired
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return GetResult{}, err
+	}
+
+	canonicalDir, err := CanonicalSkillsDir(opts.Global, cwd)
+	if err != nil {
+		return GetResult{}, err
+	}
+
+	s, err := readInstalledSkill(canonicalDir, opts.Skill)
+	if err == nil {
+		return GetResult{InstallName: opts.Skill, Skill: s}, nil
+	}
+
+	agentList := opts.Agents
+	if len(agentList) == 0 {
+		agentList, err = DetectInstalledAgents(cwd)
+		if err != nil {
+			return GetResult{}, err
+		}
+	}
+
+	for _, a := range agentList {
+		dir, err := AgentSkillsDir(a, opts.Global, cwd)
+		if err != nil {
+			continue
+		}
+
+		s, err := readInstalledSkill(dir, opts.Skill)
+		if err == nil {
+			return GetResult{InstallName: opts.Skill, Skill: s}, nil
+		}
+	}
+
+	return GetResult{}, fmt.Errorf("%w: %s", ErrSkillNotFound, opts.Skill)
+}
+
+func Remove(opts RemoveOptions) (RemoveResult, error) {
+	if len(opts.Dirs) > 0 {
 		targetDirs := dedupeDirs(opts.Dirs)
 		if len(targetDirs) == 0 {
-			return RemoveResult{}, errors.New("no target dirs specified")
+			return RemoveResult{}, ErrNoTargetDirs
 		}
 
 		var targets []string
@@ -532,7 +586,7 @@ func Remove(opts RemoveOptions) (RemoveResult, error) {
 		} else if len(opts.Skills) > 0 {
 			targets = opts.Skills
 		} else {
-			return RemoveResult{}, errors.New("no skills specified")
+			return RemoveResult{}, ErrNoSkillsSpecified
 		}
 
 		var removed []InstalledSkill
@@ -549,7 +603,12 @@ func Remove(opts RemoveOptions) (RemoveResult, error) {
 	}
 
 	if !opts.EnableAgentDiscovery {
-		return RemoveResult{}, errors.New("target dirs are required when agent discovery is disabled")
+		return RemoveResult{}, ErrAgentDiscoveryRequired
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return RemoveResult{}, err
 	}
 
 	canonicalDir, err := CanonicalSkillsDir(opts.Global, cwd)
@@ -574,7 +633,7 @@ func Remove(opts RemoveOptions) (RemoveResult, error) {
 	} else if len(opts.Skills) > 0 {
 		targets = opts.Skills
 	} else {
-		return RemoveResult{}, errors.New("no skills specified")
+		return RemoveResult{}, ErrNoSkillsSpecified
 	}
 
 	lock, err := ReadSkillLock()
@@ -632,7 +691,7 @@ func Init(opts InitOptions) (string, error) {
 	}
 
 	if _, err := os.Stat(target); err == nil {
-		return "", errors.New("SKILL.md already exists")
+		return "", ErrSkillAlreadyExists
 	}
 
 	name := opts.Name

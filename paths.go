@@ -1,7 +1,6 @@
 package skills
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 )
@@ -13,7 +12,7 @@ func HomeDir() (string, error) {
 	}
 
 	if home == "" {
-		return "", errors.New("home directory not found")
+		return "", ErrHomeNotFound
 	}
 
 	return home, nil

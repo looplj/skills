@@ -2,7 +2,6 @@ package skills
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -115,7 +114,7 @@ func FetchWellKnownIndex(ctx context.Context, baseURL string) (index WellKnownIn
 		return idx, u.Scheme + "://" + u.Host, nil
 	}
 
-	return WellKnownIndex{}, "", errors.New("no well-known skills index found")
+	return WellKnownIndex{}, "", ErrNoWellKnownIndex
 }
 
 func FetchWellKnownSkillToDir(ctx context.Context, resolvedBase string, entry WellKnownSkillEntry) (dir string, skill Skill, installName string, err error) {
@@ -133,7 +132,7 @@ func FetchWellKnownSkillToDir(ctx context.Context, resolvedBase string, entry We
 	for _, f := range entry.Files {
 		if !isSafeRelPath(f) {
 			cleanup()
-			return "", Skill{}, "", errors.New("unsafe file path in well-known index")
+			return "", Skill{}, "", ErrUnsafeFilePath
 		}
 
 		content, err := httpGetText(ctx, skillBase+"/"+f)

@@ -1,7 +1,6 @@
 package skills
 
 import (
-	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -18,7 +17,7 @@ var (
 func ParseSource(input string) (SkillSource, error) {
 	in := strings.TrimSpace(input)
 	if in == "" {
-		return SkillSource{}, errors.New("source is required")
+		return SkillSource{}, ErrSourceRequired
 	}
 
 	if looksLikeLocalPath(in) {
@@ -117,7 +116,7 @@ func ParseSource(input string) (SkillSource, error) {
 		}, nil
 	}
 
-	return SkillSource{}, errors.New("unrecognized source format")
+	return SkillSource{}, ErrUnrecognizedSource
 }
 
 func looksLikeLocalPath(p string) bool {

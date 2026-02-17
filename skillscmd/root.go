@@ -41,6 +41,7 @@ func NewRootCommand(opts RootOptions) *cobra.Command {
 	root.AddCommand(newFindCmd(stdout))
 	root.AddCommand(newAddCmd(stdout, opts))
 	root.AddCommand(newListCmd(stdout, opts))
+	root.AddCommand(newShowCmd(stdout, opts))
 	root.AddCommand(newRemoveCmd(stdout, opts))
 	root.AddCommand(newInitCmd(stdout))
 	root.AddCommand(newCheckCmd(stdout))
@@ -174,6 +175,36 @@ func newListCmd(out *os.File, rootOpts RootOptions) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&global, "global", "g", false, "List global installs")
+	cmd.Flags().StringArrayVarP(&agentNames, "agent", "a", nil, "Filter by agent (repeatable, or '*')")
+	return cmd
+}
+
+func newShowCmd(out *os.File, rootOpts RootOptions) *cobra.Command {
+	var global bool
+	var agentNames []string
+
+	cmd := &cobra.Command{
+		Use:     "get <skill>",
+		Args:    cobra.ExactArgs(1),
+		Short:   "get the content of an installed skill",
+		Example: "  skills get my-skill\n  skills get -g my-skill",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			agents := parseAgents(agentNames)
+			res, err := skills.Get(skills.GetOptions{
+				Skill:                args[0],
+				Global:               global,
+				Agents:               agents,
+				Dirs:                 rootOpts.Dirs,
+				EnableAgentDiscovery: rootOpts.EnableAgentDiscovery,
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(out, res.Skill.Content)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVarP(&global, "global", "g", false, "Look in global installs")
 	cmd.Flags().StringArrayVarP(&agentNames, "agent", "a", nil, "Filter by agent (repeatable, or '*')")
 	return cmd
 }

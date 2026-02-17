@@ -125,6 +125,20 @@ type ListedSkill struct {
 	Agents      []AgentType
 }
 
+type GetOptions struct {
+	Skill  string
+	Global bool
+	Agents []AgentType
+	Dirs   []string
+
+	EnableAgentDiscovery bool
+}
+
+type GetResult struct {
+	InstallName string
+	Skill       Skill
+}
+
 type InitOptions struct {
 	Name string
 	Dir  string
