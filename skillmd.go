@@ -7,9 +7,11 @@ import (
 )
 
 type skillFrontmatter struct {
-	Name        string         `yaml:"name"`
-	Description string         `yaml:"description"`
-	Metadata    map[string]any `yaml:"metadata"`
+	Name          string         `yaml:"name"`
+	Description   string         `yaml:"description"`
+	Compatibility string         `yaml:"compatibility"`
+	AllowedTools  string         `yaml:"allowed-tools"`
+	Metadata      map[string]any `yaml:"metadata"`
 }
 
 func ParseSkillMarkdown(content string) (Skill, error) {
@@ -34,10 +36,12 @@ func ParseSkillMarkdown(content string) (Skill, error) {
 	_ = body
 
 	return Skill{
-		Name:        parsed.Name,
-		Description: parsed.Description,
-		Content:     content,
-		Metadata:    parsed.Metadata,
+		Name:          parsed.Name,
+		Description:   parsed.Description,
+		Compatibility: parsed.Compatibility,
+		AllowedTools:  strings.Fields(parsed.AllowedTools),
+		Content:       content,
+		Metadata:      parsed.Metadata,
 	}, nil
 }
 

@@ -25,11 +25,13 @@ type AgentConfig struct {
 }
 
 type Skill struct {
-	Name        string
-	Description string
-	Dir         string
-	Content     string
-	Metadata    map[string]any
+	Name          string
+	Description   string
+	Compatibility string
+	AllowedTools  []string
+	Dir           string
+	Content       string
+	Metadata      map[string]any
 }
 
 type SkillSourceType string
