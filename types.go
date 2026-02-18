@@ -68,17 +68,38 @@ type SearchResult struct {
 }
 
 type AddOptions struct {
-	Source    string
-	Global    bool
-	Agents    []AgentType
-	Skills    []string
-	ListOnly  bool
-	Yes       bool
-	All       bool
-	FullDepth bool
-	Mode      InstallMode
-	Dirs      []string
+	// Source is the install source string (local dir, git repo reference, direct URL,
+	// or a well-known index URL).
+	Source string
 
+	// Dirs are explicit target directories to install into. When provided, agent discovery is
+	// bypassed and Add installs directly to these directories.
+	Dirs []string
+
+	// Global installs into the global skills locations rather than project-local ones.
+	// When agent discovery is enabled, global installs may also be tracked in the lock file
+	// for future update checks.
+	Global bool
+	// Agents is an optional allowlist of agent types to install for. When empty and agent
+	// discovery is enabled, installed agents may be auto-detected.
+	Agents []AgentType
+	// Skills selects which skills to install from a multi-skill source. Entries may match
+	// either the skill folder name or the parsed skill name. "*" selects all discovered skills.
+	Skills []string
+	// ListOnly discovers and returns available skills without installing anything.
+	ListOnly bool
+	// Yes enables non-interactive defaults when a choice is required (for example, when a
+	// source contains multiple skills and no explicit selection was provided).
+	Yes bool
+	// All installs all discovered skills. In Add, this implies Yes and sets Skills to "*".
+	All bool
+	// FullDepth enables deep scanning for SKILL.md files within the source directory tree.
+	FullDepth bool
+	// Mode controls how skill files are installed (for example, via symlinks or copying).
+	Mode InstallMode
+
+	// EnableAgentDiscovery enables deriving target directories from the canonical skills dir
+	// and agent-specific skills dirs when Dirs is not provided.
 	EnableAgentDiscovery bool
 }
 
@@ -97,13 +118,23 @@ type AddResult struct {
 }
 
 type RemoveOptions struct {
+	// Dirs are explicit target directories to remove from. When provided, agent discovery is
+	// bypassed and Remove deletes directly from these directories.
+	Dirs []string
+	// Global removes from the global install locations rather than project-local ones.
 	Global bool
+	// Agents is an optional allowlist of agent types to remove from. When empty and agent
+	// discovery is enabled, installed agents may be auto-detected.
 	Agents []AgentType
+	// Skills is the list of install names to remove. When empty, All must be set.
 	Skills []string
-	All    bool
-	Yes    bool
-	Dirs   []string
+	// All removes all installed skills found in the resolved target directories.
+	All bool
+	// Yes is reserved for non-interactive defaults. It is currently unused by Remove.
+	Yes bool
 
+	// EnableAgentDiscovery enables deriving target directories from the canonical skills dir
+	// and agent-specific skills dirs when Dirs is not provided.
 	EnableAgentDiscovery bool
 }
 
@@ -112,10 +143,18 @@ type RemoveResult struct {
 }
 
 type ListOptions struct {
-	Global bool
-	Agents []AgentType
-	Dirs   []string
+	// Dirs are explicit directories to list install names from. When provided, agent discovery
+	// is bypassed and List reads only these directories.
+	Dirs []string
 
+	// Global lists from the global install locations rather than project-local ones.
+	Global bool
+	// Agents is an optional allowlist of agent types to list for. When empty and agent
+	// discovery is enabled, installed agents may be auto-detected.
+	Agents []AgentType
+
+	// EnableAgentDiscovery enables deriving target directories from the canonical skills dir
+	// and agent-specific skills dirs when Dirs is not provided.
 	EnableAgentDiscovery bool
 }
 
@@ -128,11 +167,20 @@ type ListedSkill struct {
 }
 
 type GetOptions struct {
-	Skill  string
-	Global bool
-	Agents []AgentType
-	Dirs   []string
+	// Dirs are explicit directories to search. When provided, agent discovery is bypassed and
+	// Get searches only these directories.
+	Dirs []string
 
+	// Skill is the install name of the skill to load.
+	Skill string
+	// Global searches the global install locations rather than project-local ones.
+	Global bool
+	// Agents is an optional allowlist of agent types to search. When empty and agent discovery
+	// is enabled, installed agents may be auto-detected.
+	Agents []AgentType
+
+	// EnableAgentDiscovery enables deriving target directories from the canonical skills dir
+	// and agent-specific skills dirs when Dirs is not provided.
 	EnableAgentDiscovery bool
 }
 
@@ -142,8 +190,10 @@ type GetResult struct {
 }
 
 type InitOptions struct {
+	// Name is an optional folder name used to place the template under "<dir>/<name>/SKILL.md".
 	Name string
-	Dir  string
+	// Dir is the base directory to write into. When empty, the current working directory is used.
+	Dir string
 }
 
 type LockEntry struct {

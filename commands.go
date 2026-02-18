@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func resolveTargetDirs(cwd string, global bool, dirs []string, agents []AgentType, enableAgentDiscovery bool) ([]string, []AgentType, error) {
+func resolveTargetDirs(dirs []string, cwd string, global bool, agents []AgentType, enableAgentDiscovery bool) ([]string, []AgentType, error) {
 	if len(dirs) > 0 {
 		return dedupeDirs(dirs), nil, nil
 	}
@@ -19,11 +19,10 @@ func resolveTargetDirs(cwd string, global bool, dirs []string, agents []AgentTyp
 		return nil, nil, ErrAgentDiscoveryRequired
 	}
 
-	agentList := agents
-	if len(agentList) == 0 {
+	if len(agents) == 0 {
 		var err error
 
-		agentList, err = DetectInstalledAgents(cwd)
+		agents, err = DetectInstalledAgents(cwd)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -38,7 +37,7 @@ func resolveTargetDirs(cwd string, global bool, dirs []string, agents []AgentTyp
 
 	out = append(out, canonicalDir)
 
-	for _, a := range agentList {
+	for _, a := range agents {
 		dir, err := AgentSkillsDir(a, global, cwd)
 		if err != nil {
 			return nil, nil, err
@@ -47,7 +46,7 @@ func resolveTargetDirs(cwd string, global bool, dirs []string, agents []AgentTyp
 		out = append(out, dir)
 	}
 
-	return dedupeDirs(out), agentList, nil
+	return dedupeDirs(out), agents, nil
 }
 
 func dedupeDirs(dirs []string) []string {
@@ -71,6 +70,20 @@ func dedupeDirs(dirs []string) []string {
 	return out
 }
 
+// Add installs skills from opts.Source and returns what is available and/or installed.
+//
+// The source may be a local directory, a git repository reference, a direct URL, or a
+// well-known skills index. Behavior is controlled by opts:
+//   - If opts.ListOnly is true, the function only discovers and returns skills (no install).
+//   - If opts.All is true, it implies non-interactive mode and installs all discovered skills.
+//   - If opts.Mode is empty, it defaults to symlink-based installation.
+//   - If opts.Dirs is provided, it installs into those directories directly and skips agent discovery.
+//   - Otherwise, agent discovery must be enabled and target directories are derived from the
+//     canonical skills dir plus per-agent skills dirs (agents may be auto-detected when omitted).
+//
+// When installing globally with agent discovery enabled, Add also records entries in the skill lock
+// file so CheckUpdates/Update can detect and apply future updates for supported sources.
+//
 //nolint:maintidx
 func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 	if opts.All {
@@ -109,7 +122,7 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 			return AddResult{Available: []Skill{skill}}, nil
 		}
 
-		targetDirs, agents, err := resolveTargetDirs(cwd, opts.Global, opts.Dirs, opts.Agents, opts.EnableAgentDiscovery)
+		targetDirs, agents, err := resolveTargetDirs(opts.Dirs, cwd, opts.Global, opts.Agents, opts.EnableAgentDiscovery)
 		if err != nil {
 			return AddResult{}, err
 		}
@@ -177,7 +190,7 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 		if !opts.ListOnly {
 			var err error
 
-			targetDirs, agents, err = resolveTargetDirs(cwd, opts.Global, opts.Dirs, opts.Agents, opts.EnableAgentDiscovery)
+			targetDirs, agents, err = resolveTargetDirs(opts.Dirs, cwd, opts.Global, opts.Agents, opts.EnableAgentDiscovery)
 			if err != nil {
 				return AddResult{}, err
 			}
@@ -331,7 +344,7 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 		}
 	}
 
-	targetDirs, agents, err := resolveTargetDirs(cwd, opts.Global, opts.Dirs, opts.Agents, opts.EnableAgentDiscovery)
+	targetDirs, agents, err := resolveTargetDirs(opts.Dirs, cwd, opts.Global, opts.Agents, opts.EnableAgentDiscovery)
 	if err != nil {
 		return AddResult{}, err
 	}
@@ -383,12 +396,15 @@ func Add(ctx context.Context, opts AddOptions) (AddResult, error) {
 	return AddResult{Available: found, Installed: installed}, nil
 }
 
+// List returns installed skills.
+//
+// If opts.Dirs is provided, it lists install names from those directories directly. Otherwise,
+// agent discovery must be enabled and List scans the canonical skills directory plus per-agent
+// skills directories (filtered by opts.Agents when provided).
 func List(opts ListOptions) ([]ListedSkill, error) {
-
 	if len(opts.Dirs) > 0 {
 		type item struct {
 			skill Skill
-			dirs  []string
 		}
 
 		items := map[string]*item{}
@@ -406,12 +422,9 @@ func List(opts ListOptions) ([]ListedSkill, error) {
 					items[in] = it
 				}
 
-				it.dirs = append(it.dirs, root)
-				if it.skill.Name == "" {
-					s, err := readInstalledSkill(root, in)
-					if err == nil {
-						it.skill = s
-					}
+				s, err := readInstalledSkill(root, in)
+				if err == nil {
+					it.skill = s
 				}
 			}
 		}
@@ -447,9 +460,9 @@ func List(opts ListOptions) ([]ListedSkill, error) {
 		return nil, err
 	}
 
-	agentList := opts.Agents
-	if len(agentList) == 0 {
-		agentList, err = DetectInstalledAgents(cwd)
+	agents := opts.Agents
+	if len(agents) == 0 {
+		agents, err = DetectInstalledAgents(cwd)
 		if err != nil {
 			return nil, err
 		}
@@ -470,7 +483,7 @@ func List(opts ListOptions) ([]ListedSkill, error) {
 
 		var present []AgentType
 
-		for _, a := range agentList {
+		for _, a := range agents {
 			dir, err := AgentSkillsDir(a, opts.Global, cwd)
 			if err != nil {
 				continue
@@ -497,16 +510,43 @@ func List(opts ListOptions) ([]ListedSkill, error) {
 	return out, nil
 }
 
+// Get returns the full content and metadata of an installed skill by name.
+//
+// If opts.Dirs is provided, it searches only those directories. Otherwise, agent discovery must be
+// enabled and Get searches the canonical skills directory first and then per-agent skills
+// directories (filtered by opts.Agents when provided).
 func Get(opts GetOptions) (GetResult, error) {
 	if opts.Skill == "" {
 		return GetResult{}, ErrSkillNameRequired
 	}
 
 	if len(opts.Dirs) > 0 {
-		for _, root := range dedupeDirs(opts.Dirs) {
+		roots := dedupeDirs(opts.Dirs)
+		for i := len(roots) - 1; i >= 0; i-- {
+			root := roots[i]
 			s, err := readInstalledSkill(root, opts.Skill)
 			if err == nil {
 				return GetResult{InstallName: opts.Skill, Skill: s}, nil
+			}
+		}
+
+		for i := len(roots) - 1; i >= 0; i-- {
+			root := roots[i]
+
+			installNames, err := listSkillInstallNames(root)
+			if err != nil {
+				return GetResult{}, err
+			}
+
+			for _, in := range installNames {
+				s, err := readInstalledSkill(root, in)
+				if err != nil {
+					continue
+				}
+
+				if s.Name == opts.Skill {
+					return GetResult{InstallName: in, Skill: s}, nil
+				}
 			}
 		}
 
@@ -532,6 +572,22 @@ func Get(opts GetOptions) (GetResult, error) {
 		return GetResult{InstallName: opts.Skill, Skill: s}, nil
 	}
 
+	installNames, err := listSkillInstallNames(canonicalDir)
+	if err != nil {
+		return GetResult{}, err
+	}
+
+	for _, in := range installNames {
+		s, err := readInstalledSkill(canonicalDir, in)
+		if err != nil {
+			continue
+		}
+
+		if s.Name == opts.Skill {
+			return GetResult{InstallName: in, Skill: s}, nil
+		}
+	}
+
 	agentList := opts.Agents
 	if len(agentList) == 0 {
 		agentList, err = DetectInstalledAgents(cwd)
@@ -550,11 +606,37 @@ func Get(opts GetOptions) (GetResult, error) {
 		if err == nil {
 			return GetResult{InstallName: opts.Skill, Skill: s}, nil
 		}
+
+		installNames, err := listSkillInstallNames(dir)
+		if err != nil {
+			return GetResult{}, err
+		}
+
+		for _, in := range installNames {
+			s, err := readInstalledSkill(dir, in)
+			if err != nil {
+				continue
+			}
+
+			if s.Name == opts.Skill {
+				return GetResult{InstallName: in, Skill: s}, nil
+			}
+		}
 	}
 
 	return GetResult{}, fmt.Errorf("%w: %s", ErrSkillNotFound, opts.Skill)
 }
 
+// Remove deletes installed skills and returns what was removed.
+//
+// If opts.Dirs is provided, it removes from those directories directly:
+//   - opts.All removes all install names found under the given dirs.
+//   - opts.Skills removes only the specified install names.
+//
+// Otherwise, agent discovery must be enabled and Remove deletes from the canonical skills
+// directory and per-agent skills directories (filtered by opts.Agents when provided). When removing
+// from global installs, it also updates the skill lock so removed entries no longer participate in
+// update checks.
 func Remove(opts RemoveOptions) (RemoveResult, error) {
 	if len(opts.Dirs) > 0 {
 		targetDirs := dedupeDirs(opts.Dirs)
@@ -671,6 +753,11 @@ func Remove(opts RemoveOptions) (RemoveResult, error) {
 	return RemoveResult{Removed: removed}, nil
 }
 
+// Init creates a SKILL.md template on disk and returns the created file path.
+//
+// By default it writes "SKILL.md" in the working directory. If opts.Name is provided, it writes
+// "<dir>/<name>/SKILL.md". If opts.Dir is provided, it is used as the base directory instead of
+// the current working directory.
 func Init(opts InitOptions) (string, error) {
 	dir := opts.Dir
 	if dir == "" {
@@ -726,10 +813,16 @@ func Init(opts InitOptions) (string, error) {
 	return target, nil
 }
 
-func Find(ctx context.Context, query string, limit int) ([]SearchResult, error) {
+// Search searches the skills registry and returns matching results.
+func Search(ctx context.Context, query string, limit int) ([]SearchResult, error) {
 	return SearchSkills(ctx, query, limit)
 }
 
+// CheckUpdates compares globally installed skills recorded in the skill lock against their remote
+// source state and returns any detected updates.
+//
+// Currently, this only checks GitHub-based installs that have both a recorded skill folder path
+// and a recorded folder hash.
 func CheckUpdates(ctx context.Context) ([]UpdateCheck, error) {
 	lock, err := ReadSkillLock()
 	if err != nil {
@@ -776,6 +869,10 @@ func CheckUpdates(ctx context.Context) ([]UpdateCheck, error) {
 	return out, nil
 }
 
+// Update applies updates for skills reported by CheckUpdates and returns the post-update status.
+//
+// Updates are applied by re-installing the recorded skill path from GitHub into the global target
+// directories, using symlink install mode and non-interactive defaults.
 func Update(ctx context.Context) ([]UpdateCheck, error) {
 	updates, err := CheckUpdates(ctx)
 	if err != nil {

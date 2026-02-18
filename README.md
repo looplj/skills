@@ -208,7 +208,7 @@ func main() {
 }
 ```
 
-如果你不希望依赖自动发现，也可以通过 `Dirs` 指定技能目录（安装/列出/移除会直接作用在这些目录上）：
+如果你不希望依赖自动发现，也可以通过 `WorkspaceDir` / `GlobalDir` 指定技能目录（安装/列出/移除会直接作用在这些目录上）：
 
 ```go
 package main
@@ -224,7 +224,8 @@ func main() {
 		Use:                  "find-skills",
 		Stdout:               os.Stdout,
 		Stderr:               os.Stderr,
-		Dirs:                 []string{".agents/skills"},
+		WorkspaceDir:         ".agents/skills",
+		GlobalDir:            "~/.agents/skills",
 		EnableAgentDiscovery: false,
 	})
 	if err := cmd.Execute(); err != nil {

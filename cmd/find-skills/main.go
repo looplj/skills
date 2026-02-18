@@ -13,6 +13,8 @@ func main() {
 		Stdout:               os.Stdout,
 		Stderr:               os.Stderr,
 		EnableAgentDiscovery: true,
+		Commands:             nil,
+		EnableAgentFlags:     true,
 	})
 	if err := cmd.Execute(); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
