@@ -3,7 +3,7 @@ module github.com/looplj/skills/skillscmd
 go 1.23.0
 
 require (
-	github.com/looplj/skills v0.0.0
+	github.com/looplj/skills v0.0.1
 	github.com/spf13/cobra v1.8.1
 )
 
@@ -12,5 +12,3 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 )
-
-replace github.com/looplj/skills => ..
