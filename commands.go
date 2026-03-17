@@ -70,6 +70,19 @@ func dedupeDirs(dirs []string) []string {
 	return out
 }
 
+func bundledSkillsByName(skillsList []Skill) map[string]Skill {
+	items := make(map[string]Skill, len(skillsList))
+	for _, skill := range skillsList {
+		if strings.TrimSpace(skill.Name) == "" {
+			continue
+		}
+
+		items[skill.Name] = skill
+	}
+
+	return items
+}
+
 // Add installs skills from opts.Source and returns what is available and/or installed.
 //
 // The source may be a local directory, a git repository reference, a direct URL, or a
@@ -408,6 +421,12 @@ func List(opts ListOptions) ([]ListedSkill, error) {
 		}
 
 		items := map[string]*item{}
+		bundled := bundledSkillsByName(opts.BundledSkills)
+
+		for installName, skill := range bundled {
+			s := skill
+			items[installName] = &item{skill: s}
+		}
 
 		for _, root := range dedupeDirs(opts.Dirs) {
 			installNames, err := listSkillInstallNames(root)
@@ -521,6 +540,8 @@ func Get(opts GetOptions) (GetResult, error) {
 	}
 
 	if len(opts.Dirs) > 0 {
+		bundled := bundledSkillsByName(opts.BundledSkills)
+
 		roots := dedupeDirs(opts.Dirs)
 		for i := len(roots) - 1; i >= 0; i-- {
 			root := roots[i]
@@ -547,6 +568,16 @@ func Get(opts GetOptions) (GetResult, error) {
 				if s.Name == opts.Skill {
 					return GetResult{InstallName: in, Skill: s}, nil
 				}
+			}
+		}
+
+		if s, ok := bundled[opts.Skill]; ok {
+			return GetResult{InstallName: opts.Skill, Skill: s}, nil
+		}
+
+		for installName, s := range bundled {
+			if s.Name == opts.Skill {
+				return GetResult{InstallName: installName, Skill: s}, nil
 			}
 		}
 

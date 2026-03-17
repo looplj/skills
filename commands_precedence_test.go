@@ -86,3 +86,63 @@ func TestGetDirsBySkillNameWhenInstallNameDiffers(t *testing.T) {
 		t.Fatalf("expected workspace description, got %q", res.Skill.Description)
 	}
 }
+
+func TestListDirsInstalledOverridesBundled(t *testing.T) {
+	globalDir := t.TempDir()
+	workspaceDir := t.TempDir()
+
+	writeSkill(t, globalDir, "seo-audit", "seo-audit", "from global")
+	writeSkill(t, workspaceDir, "seo-audit", "seo-audit", "from workspace")
+
+	items, err := List(ListOptions{
+		BundledSkills: []Skill{{Name: "seo-audit", Description: "from bundled"}},
+		Dirs:          []string{globalDir, workspaceDir},
+	})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+
+	if items[0].Description != "from workspace" {
+		t.Fatalf("expected workspace description, got %q", items[0].Description)
+	}
+}
+
+func TestGetDirsInstalledOverridesBundled(t *testing.T) {
+	globalDir := t.TempDir()
+	workspaceDir := t.TempDir()
+
+	writeSkill(t, globalDir, "seo-audit", "seo-audit", "from global")
+	writeSkill(t, workspaceDir, "seo-audit", "seo-audit", "from workspace")
+
+	res, err := Get(GetOptions{
+		Skill:         "seo-audit",
+		BundledSkills: []Skill{{Name: "seo-audit", Description: "from bundled"}},
+		Dirs:          []string{globalDir, workspaceDir},
+	})
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+
+	if res.Skill.Description != "from workspace" {
+		t.Fatalf("expected workspace description, got %q", res.Skill.Description)
+	}
+}
+
+func TestGetFallsBackToBundledSkill(t *testing.T) {
+	res, err := Get(GetOptions{
+		Skill:         "seo-audit",
+		Dirs:          []string{t.TempDir()},
+		BundledSkills: []Skill{{Name: "seo-audit", Description: "from bundled", Content: "bundled content"}},
+	})
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+
+	if res.Skill.Description != "from bundled" {
+		t.Fatalf("expected bundled description, got %q", res.Skill.Description)
+	}
+}

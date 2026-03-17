@@ -234,6 +234,23 @@ func main() {
 }
 ```
 
+如果你还需要暴露一层 bundled skills 作为 `list/get` 的回退来源，可以直接从代码注入 `BundledSkills`。`Skill.Name` 会作为 install name 使用。当 bundled skill 与已安装 skill 同名时，已安装的 global/workspace skill 会覆盖 bundled 版本：
+
+```go
+root.AddCommand(skillscmd.NewRootCommand(skillscmd.RootOptions{
+	Use:          "find-skills",
+	WorkspaceDir: ".agents/skills",
+	GlobalDir:    "~/.agents/skills",
+	BundledSkills: []skills.Skill{
+		{
+			Name:        "seo-audit",
+			Description: "Bundled SEO audit skill",
+			Content:     "---\nname: seo-audit\ndescription: Bundled SEO audit skill\n---\n",
+		},
+	},
+}))
+```
+
 ## 认证
 
 在检查/更新 GitHub 技能时，若遇到限流或私有仓库访问需求，可配置以下任一方式：

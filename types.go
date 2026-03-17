@@ -146,6 +146,10 @@ type ListOptions struct {
 	// Dirs are explicit directories to list install names from. When provided, agent discovery
 	// is bypassed and List reads only these directories.
 	Dirs []string
+	// BundledSkills are fallback skills injected directly from code. Skill.Name is used as the
+	// install name. When the same install name exists in both BundledSkills and Dirs, entries
+	// from Dirs take precedence.
+	BundledSkills []Skill
 
 	// Global lists from the global install locations rather than project-local ones.
 	Global bool
@@ -170,6 +174,10 @@ type GetOptions struct {
 	// Dirs are explicit directories to search. When provided, agent discovery is bypassed and
 	// Get searches only these directories.
 	Dirs []string
+	// BundledSkills are fallback skills injected directly from code. Skill.Name is used as the
+	// install name. When the same install name exists in both BundledSkills and Dirs, entries
+	// from Dirs take precedence.
+	BundledSkills []Skill
 
 	// Skill is the install name of the skill to load.
 	Skill string

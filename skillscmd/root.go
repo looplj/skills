@@ -20,6 +20,7 @@ type RootOptions struct {
 	// GlobalDir is an explicit global skills directory to operate on (for example,
 	// "~/.agents/skills"). When provided, commands can operate without agent discovery.
 	GlobalDir string
+
 	// Commands limits which subcommands are registered. When empty, all commands are registered.
 	Commands []string
 	// Use is the root command name shown in help/usage output.
@@ -34,6 +35,14 @@ type RootOptions struct {
 	// EnableAgentFlags enables registering agent-related flags (like --agent).
 	// When unset, defaults to false.
 	EnableAgentFlags bool
+
+	// BundledSkills injects bundled skills directly from code as a fallback source for list/get.
+	// Skill.Name is used as the install name. Installed skills with the same install name
+	// override bundled ones.
+	BundledSkills []skills.Skill
+	// BundledSkillsFunc lazily resolves bundled skills from the command context. When set, it is
+	// called in PersistentPreRun and the result is assigned to BundledSkills.
+	BundledSkillsFunc func(context.Context) []skills.Skill
 }
 
 // NewRootCommand builds the CLI root command and registers all subcommands.
@@ -56,6 +65,11 @@ func NewRootCommand(opts RootOptions) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Short:         "Manage AI agent skills",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if rootOpts.BundledSkillsFunc != nil {
+				rootOpts.BundledSkills = rootOpts.BundledSkillsFunc(cmd.Context())
+			}
+		},
 	}
 
 	enableAgentFlags := rootOpts.EnableAgentFlags
@@ -97,7 +111,6 @@ func NewRootCommand(opts RootOptions) *cobra.Command {
 
 	root.PersistentFlags().StringVar(&rootOpts.WorkspaceDir, "workspace-dir", rootOpts.WorkspaceDir, "Workspace skills directory (e.g. .agents/skills)")
 	root.PersistentFlags().StringVar(&rootOpts.GlobalDir, "global-dir", rootOpts.GlobalDir, "Global skills directory (e.g. ~/.agents/skills)")
-
 	return root
 }
 
@@ -428,16 +441,9 @@ func parseAgents(list []string) []skills.AgentType {
 	return out
 }
 
-func agentTypeStrings(list []skills.AgentType) []string {
-	out := make([]string, 0, len(list))
-	for _, a := range list {
-		out = append(out, string(a))
-	}
-	return out
-}
-
 func listScoped(rootOpts RootOptions, agents []skills.AgentType, global bool) ([]skills.ListedSkill, error) {
 	opts := skills.ListOptions{
+		BundledSkills:        rootOpts.BundledSkills,
 		Global:               global,
 		Agents:               agents,
 		EnableAgentDiscovery: rootOpts.EnableAgentDiscovery,
@@ -456,6 +462,7 @@ func listScoped(rootOpts RootOptions, agents []skills.AgentType, global bool) ([
 
 func getScoped(rootOpts RootOptions, skill string, agents []skills.AgentType, global bool) (skills.GetResult, error) {
 	opts := skills.GetOptions{
+		BundledSkills:        rootOpts.BundledSkills,
 		Skill:                skill,
 		Global:               global,
 		Agents:               agents,
@@ -522,7 +529,7 @@ func listCmdItems(rootOpts RootOptions, agents []skills.AgentType, global bool, 
 				return nil, err
 			}
 		}
-		return skills.List(skills.ListOptions{Dirs: []string{dir}})
+		return skills.List(skills.ListOptions{Dirs: []string{dir}, BundledSkills: rootOpts.BundledSkills})
 	}
 
 	dirs, agentList, err := resolveWorkspaceThenGlobalDirs(rootOpts, agents, enableAgentDirs)
@@ -530,7 +537,7 @@ func listCmdItems(rootOpts RootOptions, agents []skills.AgentType, global bool, 
 		return nil, err
 	}
 
-	items, err := skills.List(skills.ListOptions{Dirs: dirs})
+	items, err := skills.List(skills.ListOptions{Dirs: dirs, BundledSkills: rootOpts.BundledSkills})
 	if err != nil {
 		return nil, err
 	}
@@ -594,14 +601,14 @@ func getCmdResult(rootOpts RootOptions, skill string, agents []skills.AgentType,
 				return skills.GetResult{}, err
 			}
 		}
-		return skills.Get(skills.GetOptions{Skill: skill, Global: true, Dirs: []string{dir}})
+		return skills.Get(skills.GetOptions{Skill: skill, Global: true, Dirs: []string{dir}, BundledSkills: rootOpts.BundledSkills})
 	}
 
 	dirs, _, err := resolveWorkspaceThenGlobalDirs(rootOpts, agents, enableAgentDirs)
 	if err != nil {
 		return skills.GetResult{}, err
 	}
-	return skills.Get(skills.GetOptions{Skill: skill, Dirs: dirs})
+	return skills.Get(skills.GetOptions{Skill: skill, Dirs: dirs, BundledSkills: rootOpts.BundledSkills})
 }
 
 func resolveWorkspaceThenGlobalDirs(rootOpts RootOptions, agents []skills.AgentType, includeAgentDirs bool) ([]string, []skills.AgentType, error) {

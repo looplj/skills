@@ -1,9 +1,12 @@
 package skillscmd
 
 import (
+	"context"
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	skills "github.com/looplj/skills"
 )
 
 func TestNewRootCommand_CommandsFilter(t *testing.T) {
@@ -68,6 +71,26 @@ func TestNewRootCommand_EnableAgentFlags_Disabled(t *testing.T) {
 	assertFlagMissing(t, findSubcommand(root, "get"), "agent")
 	assertFlagMissing(t, findSubcommand(root, "remove"), "agent")
 	assertFlagMissing(t, findSubcommand(root, "remove"), "all")
+}
+
+func TestNewRootCommand_BundledSkillsFuncRunsInPersistentPreRun(t *testing.T) {
+	called := false
+	root := NewRootCommand(RootOptions{
+		Use: "skills",
+		BundledSkillsFunc: func(ctx context.Context) []skills.Skill {
+			if ctx == nil {
+				t.Fatalf("expected context")
+			}
+			called = true
+			return []skills.Skill{{Name: "seo-audit", Description: "bundled"}}
+		},
+	})
+
+	root.SetContext(context.Background())
+	root.PersistentPreRun(root, nil)
+	if !called {
+		t.Fatalf("expected BundledSkillsFunc to be called")
+	}
 }
 
 func findSubcommand(root *cobra.Command, name string) *cobra.Command {
