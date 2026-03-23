@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var ErrDefaultBranchNotFound = errors.New("default branch not found")
+
 type clonedRepo struct {
 	Dir string
 }
@@ -70,11 +72,14 @@ func resolveCloneRef(ctx context.Context, repoURL string, requestedRef string) (
 	}
 
 	ref, err := detectDefaultBranch(ctx, repoURL)
-	if err == nil && ref != "" {
-		return ref, nil
+	if err != nil {
+		if errors.Is(err, ErrDefaultBranchNotFound) {
+			return "", nil
+		}
+		return "", err
 	}
 
-	return "", nil
+	return ref, nil
 }
 
 func detectDefaultBranch(ctx context.Context, repoURL string) (string, error) {
@@ -97,7 +102,7 @@ func detectDefaultBranch(ctx context.Context, repoURL string) (string, error) {
 		return strings.TrimPrefix(fields[1], "refs/heads/"), nil
 	}
 
-	return "", errors.New("default branch not found")
+	return "", ErrDefaultBranchNotFound
 }
 
 func (r *clonedRepo) ResolveSubdir(subpath string) (string, error) {
