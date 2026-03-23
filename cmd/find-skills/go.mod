@@ -2,11 +2,11 @@ module github.com/looplj/skills/cmd/find-skills
 
 go 1.23.0
 
-require github.com/looplj/skills/skillscmd v0.0.5
+require github.com/looplj/skills/skillscmd v0.0.6
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/looplj/skills v0.0.5 // indirect
+	github.com/looplj/skills v0.0.6 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
