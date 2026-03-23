@@ -26,15 +26,10 @@ func cloneRepo(ctx context.Context, src SkillSource) (*clonedRepo, error) {
 	}
 
 	repoURL := normalizeRepoURL(src)
-	ref, err := resolveCloneRef(ctx, repoURL, src.Ref)
-	if err != nil {
-		cleanup()
-		return nil, err
-	}
 
 	args := []string{"clone", "--depth", "1"}
-	if ref != "" {
-		args = append(args, "--branch", ref)
+	if src.Ref != "" {
+		args = append(args, "--branch", src.Ref)
 	}
 	args = append(args, repoURL, tmp)
 
