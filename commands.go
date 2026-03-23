@@ -919,11 +919,11 @@ func Update(ctx context.Context) ([]UpdateCheck, error) {
 		}
 
 		ref := u.Entry.Source.Ref
-		if ref == "" {
-			ref = "main"
+		srcURL := "https://github.com/" + owner + "/" + repo
+		if ref != "" {
+			srcURL += "/tree/" + ref
 		}
-
-		srcURL := "https://github.com/" + owner + "/" + repo + "/tree/" + ref + "/" + strings.TrimPrefix(u.Entry.SkillPath, "/")
+		srcURL += "/" + strings.TrimPrefix(u.Entry.SkillPath, "/")
 		_, _ = Add(ctx, AddOptions{
 			Source:               srcURL,
 			Global:               true,

@@ -58,7 +58,6 @@ func ParseSource(input string) (SkillSource, error) {
 					SourceURL: in,
 					Owner:     parts[0],
 					Repo:      strings.TrimSuffix(parts[1], ".git"),
-					Ref:       "main",
 				}, nil
 			}
 		}
@@ -111,7 +110,6 @@ func ParseSource(input string) (SkillSource, error) {
 			SourceURL:   "https://github.com/" + repoPart,
 			Owner:       owner,
 			Repo:        repo,
-			Ref:         "main",
 			SkillFilter: skillFilter,
 		}, nil
 	}

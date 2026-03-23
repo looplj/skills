@@ -23,6 +23,31 @@ func cloneRepo(ctx context.Context, src SkillSource) (*clonedRepo, error) {
 		_ = os.RemoveAll(tmp)
 	}
 
+	repoURL := normalizeRepoURL(src)
+	ref, err := resolveCloneRef(ctx, repoURL, src.Ref)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+
+	args := []string{"clone", "--depth", "1"}
+	if ref != "" {
+		args = append(args, "--branch", ref)
+	}
+	args = append(args, repoURL, tmp)
+
+	cmd := exec.CommandContext(ctx, "git", args...)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		cleanup()
+		return nil, errors.New("git clone failed: " + strings.TrimSpace(string(out)))
+	}
+
+	return &clonedRepo{Dir: tmp}, nil
+}
+
+func normalizeRepoURL(src SkillSource) string {
 	repoURL := src.SourceURL
 	if src.Type == SkillSourceTypeGitHub && src.Owner != "" && src.Repo != "" && !strings.HasPrefix(repoURL, "http") {
 		repoURL = "https://github.com/" + src.Owner + "/" + src.Repo + ".git"
@@ -36,21 +61,43 @@ func cloneRepo(ctx context.Context, src SkillSource) (*clonedRepo, error) {
 		repoURL = repoURL + ".git"
 	}
 
-	ref := src.Ref
-	if ref == "" {
-		ref = "main"
+	return repoURL
+}
+
+func resolveCloneRef(ctx context.Context, repoURL string, requestedRef string) (string, error) {
+	if requestedRef != "" {
+		return requestedRef, nil
 	}
 
-	args := []string{"clone", "--depth", "1", "--branch", ref, repoURL, tmp}
-	cmd := exec.CommandContext(ctx, "git", args...)
+	ref, err := detectDefaultBranch(ctx, repoURL)
+	if err == nil && ref != "" {
+		return ref, nil
+	}
 
+	return "", nil
+}
+
+func detectDefaultBranch(ctx context.Context, repoURL string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--symref", repoURL, "HEAD")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		cleanup()
-		return nil, errors.New("git clone failed: " + strings.TrimSpace(string(out)))
+		return "", errors.New("git ls-remote failed: " + strings.TrimSpace(string(out)))
 	}
 
-	return &clonedRepo{Dir: tmp}, nil
+	for _, line := range strings.Split(string(out), "\n") {
+		if !strings.HasPrefix(line, "ref:") || !strings.Contains(line, "\tHEAD") {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+
+		return strings.TrimPrefix(fields[1], "refs/heads/"), nil
+	}
+
+	return "", errors.New("default branch not found")
 }
 
 func (r *clonedRepo) ResolveSubdir(subpath string) (string, error) {
