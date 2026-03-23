@@ -3,7 +3,7 @@ module github.com/looplj/skills/skillscmd
 go 1.23.0
 
 require (
-	github.com/looplj/skills v0.0.5
+	github.com/looplj/skills v0.0.6
 	github.com/spf13/cobra v1.8.1
 )
 
