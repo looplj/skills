@@ -918,12 +918,16 @@ func Update(ctx context.Context) ([]UpdateCheck, error) {
 			continue
 		}
 
-		ref := u.Entry.Source.Ref
-		if ref == "" {
-			ref = "main"
+		ref, err := resolveCloneRef(ctx, "https://github.com/"+owner+"/"+repo+".git", u.Entry.Source.Ref)
+		if err != nil {
+			continue
 		}
 
-		srcURL := "https://github.com/" + owner + "/" + repo + "/tree/" + ref + "/" + strings.TrimPrefix(u.Entry.SkillPath, "/")
+		srcURL := "https://github.com/" + owner + "/" + repo
+		if ref != "" {
+			srcURL += "/tree/" + ref
+		}
+		srcURL += "/" + strings.TrimPrefix(u.Entry.SkillPath, "/")
 		_, _ = Add(ctx, AddOptions{
 			Source:               srcURL,
 			Global:               true,

@@ -32,6 +32,21 @@ func TestParseSource_GitHubShorthand(t *testing.T) {
 	if src.Owner != "vercel-labs" || src.Repo != "agent-skills" {
 		t.Fatalf("owner/repo mismatch: %s/%s", src.Owner, src.Repo)
 	}
+
+	if src.Ref != "" {
+		t.Fatalf("expected empty ref for default branch discovery, got %q", src.Ref)
+	}
+}
+
+func TestParseSource_GitHubRepoURL(t *testing.T) {
+	src, err := ParseSource("https://github.com/a/b")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+
+	if src.Type != SkillSourceTypeGitHub || src.Ref != "" {
+		t.Fatalf("expected github source with empty ref, got %#v", src)
+	}
 }
 
 func TestParseSource_GitHubTreeURL(t *testing.T) {
